@@ -44,6 +44,27 @@ class ChangeSovitsRequest(BaseModel):
 class ChangeGptRequest(BaseModel):
     gpt_path: str
 
+# 为fast版本添加新的请求体模型
+class TTSFastRequest(BaseModel):
+    ref_audio_path: str
+    prompt_text: str
+    prompt_lang: str = "中文"
+    text: str
+    text_lang: str = "中文"
+    text_split_method: str = "不切"
+    top_k: int = 20
+    top_p: float = 0.6
+    temperature: float = 0.6
+    ref_text_free: bool = False
+    speed_factor: float = 1.0
+    batch_size: int = 20
+    split_bucket: bool = True
+    fragment_interval: float = 0.3
+    seed: int = -1
+    keep_random: bool = True
+    parallel_infer: bool = True
+    repetition_penalty: float = 1.35
+
 # 设置日志
 logging.basicConfig(
     level=logging.INFO,
@@ -54,7 +75,8 @@ logger = logging.getLogger("uvicorn")
 
 
 # 导入源码并执行初始化
-import inference_webui
+from GPT_SoVITS import inference_webui
+from GPT_SoVITS import inference_webui_fast
 
 # 创建FastAPI应用
 app = FastAPI()
@@ -201,6 +223,64 @@ async def change_choices_api():
         
         return sovits_choices, gpt_choices
         
+    except Exception as e:
+        logger.error(f"错误: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=422, detail=str(e))
+
+@app.post("/tts_fast")
+async def tts_fast_api(request: TTSFastRequest):
+    try:
+        # 检查是否是网络链接
+        if request.ref_audio_path.startswith(('http://', 'https://')):
+            # 下载音频文件
+            response = requests.get(request.ref_audio_path)
+            if response.status_code != 200:
+                raise ValueError(f"无法下载音频文件: {request.ref_audio_path}")
+
+            audio_data = response.content
+            # 保存音频文件
+            temp_audio_path = "temp_audio.wav"
+            with open(temp_audio_path, "wb") as f:
+                f.write(audio_data)
+            request.ref_audio_path = temp_audio_path
+
+        # 调用fast版本的inference函数
+        sr, audio_opt = next(inference_webui_fast.inference(
+            text=request.text,
+            text_lang=request.text_lang,
+            ref_audio_path=request.ref_audio_path,
+            aux_ref_audio_paths=None,  # 暂不支持多参考音频
+            prompt_text=request.prompt_text,
+            prompt_lang=request.prompt_lang,
+            top_k=request.top_k,
+            top_p=request.top_p,
+            temperature=request.temperature,
+            text_split_method=request.text_split_method,
+            batch_size=request.batch_size,
+            speed_factor=request.speed_factor,
+            ref_text_free=request.ref_text_free,
+            split_bucket=request.split_bucket,
+            fragment_interval=request.fragment_interval,
+            seed=request.seed,
+            keep_random=request.keep_random,
+            parallel_infer=request.parallel_infer,
+            repetition_penalty=request.repetition_penalty
+        ))
+
+        # 将音频数据转换为WAV格式
+        audio_bytes = io.BytesIO()
+        wav.write(audio_bytes, sr, audio_opt)
+        audio_bytes.seek(0)
+
+        # 如果使用了临时文件，删除它
+        if request.ref_audio_path == "temp_audio.wav":
+            try:
+                os.remove(request.ref_audio_path)
+            except:
+                pass
+
+        return StreamingResponse(audio_bytes, media_type="audio/wav")
     except Exception as e:
         logger.error(f"错误: {str(e)}")
         logger.error(traceback.format_exc())
