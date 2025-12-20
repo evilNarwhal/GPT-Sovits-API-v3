@@ -13,6 +13,7 @@ import logging
 import os
 import requests
 import json
+import importlib
 # 定义端口
 PORT = 9876
 # 定义主机
@@ -43,6 +44,10 @@ class ChangeSovitsRequest(BaseModel):
 
 class ChangeGptRequest(BaseModel):
     gpt_path: str
+
+# version switch request
+class ChangeVersionRequest(BaseModel):
+    version: str
 
 # 为fast版本添加新的请求体模型
 class TTSFastRequest(BaseModel):
@@ -93,6 +98,7 @@ app.add_middleware(
 # 添加全局异常处理器
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # 统一校验错误返回结构，方便前端/调用方处理。
     logger.error("请求参数验证错误:")
     logger.error(str(exc))
     return JSONResponse(
@@ -103,7 +109,9 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
 
 @app.post("/tts")
 async def tts_api(request: TTSRequest):
+    # 标准推理接口：支持本地路径或URL参考音频。
     try:
+        # 支持 ref_wav_path 为 URL：先下载到临时文件，再走推理。
         # 检查是否是网络链接
         if request.ref_wav_path.startswith(('http://', 'https://')):
             # 下载音频文件
@@ -119,7 +127,7 @@ async def tts_api(request: TTSRequest):
             request.ref_wav_path = temp_audio_path
        
 
-        # 调用 get_tts_wav 函数
+        # 调用推理函数生成音频（返回采样率和PCM）。
         sr, audio_opt = next(get_tts_wav(
             ref_wav_path=request.ref_wav_path,
             prompt_text=request.prompt_text,
@@ -138,12 +146,12 @@ async def tts_api(request: TTSRequest):
             pause_second=request.pause_second
         ))
         
-        # 将音频数据转换为WAV格式
+        # 将PCM写入内存WAV，作为流式响应返回。
         audio_bytes = io.BytesIO()
         wav.write(audio_bytes, sr, audio_opt)
         audio_bytes.seek(0)
 
-        # 如果使用了临时文件，删除它
+        # 清理临时文件（仅当使用了临时路径）。
         if request.ref_wav_path == "temp_ref.wav":
             try:
                 os.remove(request.ref_wav_path)
@@ -158,7 +166,9 @@ async def tts_api(request: TTSRequest):
 
 @app.post("/change_sovits_weights")
 async def change_sovits_weights_api(request: ChangeSovitsRequest):
+    # 切换 SoVITS 权重路径，并记录前后状态。
     try:
+        # 记录切换前后状态，便于排查版本/路径是否正确更新。
         # 记录切换前的配置
         logger.info("切换前的配置:")
         check_current_weights()
@@ -182,7 +192,9 @@ async def change_sovits_weights_api(request: ChangeSovitsRequest):
 
 @app.post("/change_gpt_weights")
 async def change_gpt_weights(data: dict):
+    # 切换 GPT 权重路径，并记录前后状态。
     try:
+        # 仅需传入 gpt_path，立即切换当前权重。
         gpt_path = data["gpt_path"]
         
         # 记录切换前的配置
@@ -204,7 +216,9 @@ async def change_gpt_weights(data: dict):
 
 @app.post("/change_choices")
 async def change_choices_api():
+    # 返回当前扫描到的可用模型列表。
     try:
+        # 返回可用模型列表，等价于 WebUI 的“刷新模型路径”。
         # 记录当前配置
         logger.info("检查当前使用的json模型:")
         check_current_weights()
@@ -230,7 +244,9 @@ async def change_choices_api():
 
 @app.post("/tts_fast")
 async def tts_fast_api(request: TTSFastRequest):
+    # fast 版本推理接口：用于更快的推理管线。
     try:
+        # fast 版本推理接口，支持 URL 参考音频。
         # 检查是否是网络链接
         if request.ref_audio_path.startswith(('http://', 'https://')):
             # 下载音频文件
@@ -245,7 +261,7 @@ async def tts_fast_api(request: TTSFastRequest):
                 f.write(audio_data)
             request.ref_audio_path = temp_audio_path
 
-        # 调用fast版本的inference函数
+        # 调用 fast 推理函数（返回采样率和PCM）。
         sr, audio_opt = next(inference_webui_fast.inference(
             text=request.text,
             text_lang=request.text_lang,
@@ -268,7 +284,7 @@ async def tts_fast_api(request: TTSFastRequest):
             repetition_penalty=request.repetition_penalty
         ))
 
-        # 将音频数据转换为WAV格式
+        # 将PCM写入内存WAV，作为流式响应返回。
         audio_bytes = io.BytesIO()
         wav.write(audio_bytes, sr, audio_opt)
         audio_bytes.seek(0)
@@ -288,6 +304,7 @@ async def tts_fast_api(request: TTSFastRequest):
 
 def check_current_weights():
     """检查当前使用的模型"""
+    # 读取 weight.json，输出各版本对应的 GPT/SoVITS 权重路径。
     with open("./weight.json", 'r', encoding="utf-8") as f:
         data = json.load(f)
         # 检查所有版本
@@ -297,6 +314,27 @@ def check_current_weights():
         logger.info(f"GPT 模型: {gpt_models}")
         
         return data
+
+def reload_inference_modules():
+    # 重新加载推理模块以应用新的版本环境变量与全局状态。
+    global inference_webui, inference_webui_fast
+    inference_webui = importlib.reload(inference_webui)
+    inference_webui_fast = importlib.reload(inference_webui_fast)
+
+@app.post("/change_version")
+async def change_version_api(request: ChangeVersionRequest):
+    # 切换版本并重载推理模块，确保按新版本初始化。
+    try:
+        # 切换版本：更新环境变量并重载模块。
+        os.environ["version"] = request.version
+        reload_inference_modules()
+        logger.info("当前版本已切换为: %s", request.version)
+        check_current_weights()
+        return {"status": "success", "version": request.version}
+    except Exception as e:
+        logger.error(f"错误: {str(e)}")
+        logger.error(traceback.format_exc())
+        raise HTTPException(status_code=422, detail=str(e))
 
 # 启动服务
 if __name__ == "__main__":

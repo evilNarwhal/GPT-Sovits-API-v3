@@ -4,13 +4,13 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 [English Documentation](#english-version)
 
 ## 创建原因
-### 1. 由于原生API（api.py文件）的参数与网页端不同，在WebUI中调试完成后，使用相同的模型调用原生API可能需要重新调整原API的参数，而直接调用webUI的API则能直接获取到调试后的声音
-### 2. 由于gradio的限制，接口定义不同，且跨域设置较为麻烦
-### 3. gradio的api并不直接返回音频，且不支持传输音频的网络路径
+### 1. 由于原生API（api.py文件）的参数与webui不同，为了准确获取再在webUI中调试的声音，这里直接提供webUI的API调用
+### 2. 直接使用gradio网页端有跨域限制，且网页端不支持传输解析网络音频，不直接返回音频，故基于网页端实现该API调用形式
+
 
 ## 使用方法
 
-### 1. 将webui_api.py文件和webui_api.bat文件放在GPT-Sovits的根目录下（与go-webui.bat文件同级）
+### 1. 将webui_api.py文件和webui_api.bat文件放在整合包的根目录下（与go-webui.bat文件同级）
 
 ### 2. 在go-webui.py文件中修改对应启动参数（如端口号，跨域设置，也可以直接使用默认）
 
@@ -20,15 +20,13 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 
 **注意：**
 
-- 在根目录创建weight.json文件，并添加模型路径(初始化时使用)，注意：GPT_Sovits文件夹中也有一个weight.json文件，这里要区分，根目录的是API专用的，GPT_Sovits文件夹中的是网页端自带的
+- 未填写weight.json的话，程序会默认在根目录创建一个weight.json
 
-- 如果没有weight.json文件，则默认创建并在v1版本中添加默认模型路径
+- 注意weight.json文件的格式,当前API默认使用v2Pro版本的模型（程序默认使用v2版本），在使用前将训练好的模型和版本写入json文件
 
-- 观看weight.json文件的格式，并根据格式将你的模型路径添加到v2版本，因为当前v2,v3自定义模型其实都是放在v2版本中，只有v3的底模是放在v3版本中，一个版本只能有一个模型
+- 接口的实现直接导入源文件中的原生方法，没有更改原来的代码，不影响原webUI的正常使用
 
-- 接口的实现只调用了"GPT-SoVITS-v3lora-20250228\GPT_SoVITS\inference_webui.py"中的原生方法，没有更改原本的代码，不会影响网页端的正常使用
-
-- 该API的实现是基于v3版本，参数未兼容v2版本和v1版本
+- 该API更新基于GPT-SoVITS-v2pro-20250604更新。
 
 ## 接口说明
 
@@ -55,7 +53,33 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 返回：
 - 音频文件（WAV格式）
 
-### 2. 切换SoVITS模型 (POST /change_sovits_weights)
+### 2. 获取音频-快速版 (POST /tts_fast)
+使用 fast 推理管线获取音频，参数与 fast 版推理接口一致。
+
+请求参数：
+- ref_audio_path: 参考音频路径（支持本地文件路径或网络URL）
+- prompt_text: 提示文本（默认：空）
+- prompt_lang: 提示文本语言（默认："中文"）
+- text: 需要转换的文本
+- text_lang: 文本语言（默认："中文"）
+- text_split_method: 切分方式（默认："不切"）
+- top_k: Top K 采样参数（默认：20）
+- top_p: Top P 采样参数（默认：0.6）
+- temperature: 温度参数（默认：0.6）
+- ref_text_free: 是否启用无文本参考模式（默认：false）
+- speed_factor: 语速（默认：1.0）
+- batch_size: batch size（默认：20）
+- split_bucket: 是否启用分桶（默认：true）
+- fragment_interval: 片段间隔（默认：0.3）
+- seed: 随机种子（默认：-1）
+- keep_random: 是否保持随机（默认：true）
+- parallel_infer: 是否并行推理（默认：true）
+- repetition_penalty: 重复惩罚（默认：1.35）
+
+返回：
+- 音频文件（WAV格式）
+
+### 3. 切换SoVITS模型 (POST /change_sovits_weights)
 切换当前使用的SoVITS模型。
 
 请求参数：
@@ -66,7 +90,7 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 返回：
 - 切换状态信息
 
-### 3. 切换GPT模型 (POST /change_gpt_weights)
+### 4. 切换GPT模型 (POST /change_gpt_weights)
 切换当前使用的GPT模型。
 
 请求参数：
@@ -75,12 +99,21 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 返回：
 - 切换状态信息
 
-### 4. 获取可用模型列表 (POST /change_choices)
+### 5. 获取可用模型列表 (POST /change_choices)
 获取系统中可用的SoVITS和GPT模型列表。
 
 返回：
 - sovits_choices: 可用的SoVITS模型列表
 - gpt_choices: 可用的GPT模型列表
+
+### 6. 切换版本 (POST /change_version)
+切换推理版本，并重载推理模块以应用新版本配置。
+
+请求参数：
+- version: 目标版本（例如 "v2"、"v2Pro"、"v3"、"v4" 等）
+
+返回：
+- 切换状态信息
 
 ---
 
@@ -139,7 +172,33 @@ Request Parameters:
 Returns:
 - Audio file (WAV format)
 
-### 2. Switch SoVITS Model (POST /change_sovits_weights)
+### 2. Generate Audio - Fast (POST /tts_fast)
+Use the fast inference pipeline to generate audio.
+
+Request Parameters:
+- ref_audio_path: Reference audio path (supports local file path or URL)
+- prompt_text: Prompt text (default: empty)
+- prompt_lang: Prompt language (default: "Chinese")
+- text: Text to convert
+- text_lang: Text language (default: "Chinese")
+- text_split_method: Split method (default: "ä¸åˆ‡")
+- top_k: Top K sampling parameter (default: 20)
+- top_p: Top P sampling parameter (default: 0.6)
+- temperature: Temperature parameter (default: 0.6)
+- ref_text_free: Enable text-free reference mode (default: false)
+- speed_factor: Speech speed (default: 1.0)
+- batch_size: Batch size (default: 20)
+- split_bucket: Enable bucket splitting (default: true)
+- fragment_interval: Fragment interval (default: 0.3)
+- seed: Random seed (default: -1)
+- keep_random: Keep randomness (default: true)
+- parallel_infer: Parallel inference (default: true)
+- repetition_penalty: Repetition penalty (default: 1.35)
+
+Returns:
+- Audio file (WAV format)
+
+### 3. Switch SoVITS Model (POST /change_sovits_weights)
 Switch the current SoVITS model.
 
 Request Parameters:
@@ -150,7 +209,7 @@ Request Parameters:
 Returns:
 - Switch status information
 
-### 3. Switch GPT Model (POST /change_gpt_weights)
+### 4. Switch GPT Model (POST /change_gpt_weights)
 Switch the current GPT model.
 
 Request Parameters:
@@ -159,12 +218,21 @@ Request Parameters:
 Returns:
 - Switch status information
 
-### 4. Get Available Models (POST /change_choices)
+### 5. Get Available Models (POST /change_choices)
 Get list of available SoVITS and GPT models in the system.
 
 Returns:
 - sovits_choices: Available SoVITS models list
 - gpt_choices: Available GPT models list
+
+### 6. Switch Version (POST /change_version)
+Switch inference version and reload inference modules.
+
+Request Parameters:
+- version: Target version (e.g. "v2", "v2Pro", "v3", "v4")
+
+Returns:
+- Switch status information
 
 
 
