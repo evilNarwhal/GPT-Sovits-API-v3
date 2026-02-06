@@ -1,0 +1,9 @@
+node_modules/
+electron/node_modules/
+electron/dist/
+electron/build/
+electron/out/
+gpt-sovits-gui/node_modules/
+gpt-sovits-gui/dist/
+gpt-sovits-gui/.vite/
+gpt-sovits-gui/.env

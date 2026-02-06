@@ -22,7 +22,7 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 
 - 未填写weight.json的话，程序会默认在根目录创建一个weight.json
 
-- 注意weight.json文件的格式,当前API默认使用v2Pro版本的模型（程序默认使用v2版本），在使用前将训练好的模型和版本写入json文件
+- 注意weight.json文件的格式,程序默认使用v2版本，在使用前将训练好的模型和版本写入json文件
 
 - 接口的实现直接导入源文件中的原生方法，没有更改原来的代码，不影响原webUI的正常使用
 
@@ -114,6 +114,57 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 
 返回：
 - 切换状态信息
+
+### 7. 上传参考音频 (POST /upload_ref_audio)
+上传参考音频到临时目录，返回临时 URL。
+
+请求参数：
+- file: 参考音频文件（multipart/form-data）
+
+返回：
+- temp_url: 临时访问 URL
+- name: 原始文件名
+- temp_name: 临时文件名
+
+### 8. 转存参考音频 (POST /promote_ref_audio)
+将临时参考音频转存到正式目录，返回可访问 URL。
+
+请求参数：
+- temp_name: 临时文件名
+
+返回：
+- url: 正式访问 URL
+- name: 文件名
+
+### 9. 语音识别 ASR (POST /asr)
+上传音频并调用 ASR 脚本进行识别，返回 .list 解析结果。
+
+请求参数：
+- files: 音频文件列表（multipart/form-data）
+- asr_model: ASR 模型（默认："Faster Whisper (多语种)"）
+- asr_model_size: 模型大小（默认："large-v3"）
+- asr_lang: 语言（默认："zh"）
+- asr_precision: 精度（默认："int8"）
+
+返回：
+- items: 识别结果列表（file_path、folder、lang、text）
+- used: 实际使用的参数
+
+## 函数说明（webui_api.py）
+- resolve_local_ref_audio：解析指向本机静态目录的 URL，并映射到本地路径
+- validation_exception_handler：统一参数校验错误的返回格式
+- tts_api：标准 TTS 推理接口，支持本地/网络参考音频并流式返回 WAV
+- change_sovits_weights_api：切换 SoVITS 权重并记录前后配置
+- change_gpt_weights：切换 GPT 权重并记录前后配置
+- change_choices_api：刷新并返回可用模型列表
+- tts_fast_api：Fast 推理接口，返回音频流并在响应头携带 seed
+- upload_ref_audio：上传参考音频到临时目录并返回临时 URL
+- promote_ref_audio：将临时参考音频转存到正式目录并返回 URL
+- run_asr_with_webui_logic：复用 WebUI 的 ASR 调用逻辑并执行脚本
+- asr_api：上传音频批量识别并解析 .list 输出
+- check_current_weights：读取 weight.json 并打印当前模型配置
+- reload_inference_modules：重载推理模块以应用版本切换
+- change_version_api：切换版本并重载推理模块
 
 ---
 
@@ -233,6 +284,41 @@ Request Parameters:
 
 Returns:
 - Switch status information
+
+### 7. Upload Reference Audio (POST /upload_ref_audio)
+Upload a reference audio file to the temp directory and return a temp URL.
+
+Request Parameters:
+- file: Audio file (multipart/form-data)
+
+Returns:
+- temp_url: Temporary access URL
+- name: Original file name
+- temp_name: Temporary file name
+
+### 8. Promote Reference Audio (POST /promote_ref_audio)
+Move a temporary reference audio file to the final directory and return a URL.
+
+Request Parameters:
+- temp_name: Temporary file name
+
+Returns:
+- url: Final access URL
+- name: File name
+
+### 9. ASR (POST /asr)
+Upload audio and run ASR, returning parsed .list results.
+
+Request Parameters:
+- files: Audio file list (multipart/form-data)
+- asr_model: ASR model (default: "Faster Whisper (Multilingual)")
+- asr_model_size: Model size (default: "large-v3")
+- asr_lang: Language (default: "zh")
+- asr_precision: Precision (default: "int8")
+
+Returns:
+- items: Recognition results (file_path, folder, lang, text)
+- used: Actual parameters used
 
 
 
