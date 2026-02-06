@@ -178,9 +178,11 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 - 使用体验：独立桌面窗口，避免浏览器标签混乱
 - 便于分发：依赖与配置集中，适合一键启动打包
 
+演示视频（Release）：[下载链接](https://github.com/evilNarwhal/GPT-Sovits-API-WebUI/releases/download/tts/QQ202625-205753.mp4)
+
 ---
 
-# <a name="english-version"></a>GS_webui_api for GPT-Sovits-v3
+# <a name="english-version"></a>GS_webui_api for GPT-Sovits-v4
 An API for GPT-Sovits inference web interface, providing customizable and portable interfaces to obtain the voice output tuned through the web interface.
 
 ## Why This API
@@ -203,6 +205,8 @@ An API for GPT-Sovits inference web interface, providing customizable and portab
 2. Start Vite dev server: `pnpm dev` (default `http://localhost:5173`, Electron main process loads this URL)
 3. Enter `electron`, install deps and start: `pnpm install` → `pnpm start`
 4. If you need a different API endpoint, update `deployUrl` in `electron/config.json`
+
+Demo video (Release): [download link](https://github.com/evilNarwhal/GPT-Sovits-API-WebUI/releases/download/tts/QQ202625-205753.mp4)
 
 **Notes:**
 
