@@ -1,4 +1,4 @@
-# GS_webui_api for GPT-Sovits-v3
+# GS_webui_api for GPT-Sovits-v4
 GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通过调用API获取网页端调试好的声音，避免原生API参数与网页端不同导致声音不一致
 
 [English Documentation](#english-version)
@@ -8,11 +8,11 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 ### 2. 直接使用gradio网页端有跨域限制，且网页端不支持传输解析网络音频，不直接返回音频，故基于网页端实现该API调用形式
 
 
-## 使用方法
+## API使用方法
 
 ### 1. 将webui_api.py文件和webui_api.bat文件放在整合包的根目录下（与go-webui.bat文件同级）
 
-### 2. 在go-webui.py文件中修改对应启动参数（如端口号，跨域设置，也可以直接使用默认）
+### 2. 在webui_api.py文件中修改对应启动参数（如端口号，跨域设置，也可以直接使用默认）
 
 ### 3. 在根目录创建weight.json文件，并添加模型路径(初始化时使用)
 
@@ -166,6 +166,18 @@ GPT-Sovtis推理页面的API，提供自定义通用便携的接口，允许通�
 - reload_inference_modules：重载推理模块以应用版本切换
 - change_version_api：切换版本并重载推理模块
 
+### 桌面端（Electron）
+1. 进入 `gpt-sovits-gui`，安装依赖：`pnpm install`
+2. 启动 Vite 开发服务：`pnpm dev`（默认端口 5173，Electron 主进程加载 `http://localhost:5173`）
+3. 进入 `electron`，安装依赖并启动：`pnpm install` → `pnpm start`
+4. 启动整合包的webui_api.bat文件运行API服务端，桌面端填写对应的地址及端口
+
+**桌面端优势**
+- 自动记忆：最近使用的版本与配置保存在本地（`electron/config.json`）
+- 配置保存：多套配置可本地保存，切换更快
+- 使用体验：独立桌面窗口，避免浏览器标签混乱
+- 便于分发：依赖与配置集中，适合一键启动打包
+
 ---
 
 # <a name="english-version"></a>GS_webui_api for GPT-Sovits-v3
@@ -185,6 +197,12 @@ An API for GPT-Sovits inference web interface, providing customizable and portab
 ### 3. Create a weight.json file in the root directory and add model paths (used during initialization)
 
 ### 4. After configuration, double-click webui_api.bat for one-click startup. API inputs and returns are the same as gradio (except audio retrieval returns WAV)
+
+### Desktop (Electron)
+1. Enter `gpt-sovits-gui`, install deps: `pnpm install` (or `npm install`)
+2. Start Vite dev server: `pnpm dev` (default `http://localhost:5173`, Electron main process loads this URL)
+3. Enter `electron`, install deps and start: `pnpm install` → `pnpm start`
+4. If you need a different API endpoint, update `deployUrl` in `electron/config.json`
 
 **Notes:**
 
